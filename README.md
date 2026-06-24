@@ -1,6 +1,6 @@
 ﻿# Exchange 邮箱清单导出 & 仪表板
 
-Exchange 2016 邮箱用户清单导出工具，支持按数据库批量拉取 9000+ 邮箱的统计数据（大小、登录时间、AD 属性等），配套 Web 仪表板可搜索、排序、筛选，数据通过 HTTP 推送到前端服务器。
+Exchange 2016 邮箱用户清单导出工具，支持按数据库批量拉取邮箱的统计数据（大小、登录时间、AD 属性等），配套 Web 仪表板可搜索、排序、筛选，数据通过 HTTP 推送到前端服务器。
 
 ## 系统架构
 
@@ -108,6 +108,6 @@ D:\GetMailbox.ps1 -ServerUrl "https://mailbox-report.yourcompany.com"
 ## 注意事项
 
 - 在 Exchange Management Shell 中以管理员身份运行脚本
-- 9000+ 邮箱建议非高峰时段运行
+- 1W+ 邮箱建议非高峰时段运行
 - 如需 Basic Auth 认证仪表板，在 nginx.conf 中添加 auth_basic 配置
 - PowerShell 推送时自动将请求体编码为 UTF-8，避免中文乱码
