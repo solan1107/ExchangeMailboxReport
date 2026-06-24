@@ -1,0 +1,266 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exchange 邮箱清单</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f5f6fa; color: #2c3e50; font-size: 14px; }
+
+  .header { background: #1a237e; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .update-info { font-size: 13px; color: #aab; }
+
+  .container { max-width: 1600px; margin: 0 auto; padding: 16px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .stat-card .label { font-size: 12px; color: #7f8c8d; margin-bottom: 4px; }
+  .stat-card .value { font-size: 24px; font-weight: 700; }
+  .stat-card .value.green { color: #27ae60; }
+  .stat-card .value.red   { color: #e74c3c; }
+  .stat-card .value.blue  { color: #2980b9; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar input[type="search"] { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #dcdde1; border-radius: 6px; font-size: 14px; outline: none; }
+  .toolbar input[type="search"]:focus { border-color: #1a237e; }
+  .toolbar .col-toggle { position: relative; }
+  .toolbar .col-toggle summary { cursor: pointer; padding: 8px 12px; border: 1px solid #dcdde1; border-radius: 6px; font-size: 13px; background: #fff; user-select: none; }
+  .toolbar .col-toggle[open] summary { border-color: #1a237e; }
+  .toolbar .col-toggle ul { position: absolute; right: 0; top: 36px; background: #fff; border: 1px solid #dcdde1; border-radius: 6px; padding: 8px; list-style: none; z-index: 10; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .toolbar .col-toggle li { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 13px; }
+  .toolbar .col-toggle li:hover { background: #f0f0f0; }
+  .toolbar .col-toggle li.hidden { color: #999; }
+  .toolbar .btn-export { padding: 8px 16px; border: none; border-radius: 6px; background: #1a237e; color: #fff; font-size: 13px; cursor: pointer; }
+  .toolbar .btn-export:hover { background: #283593; }
+
+  .table-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { background: #f8f9fa; position: sticky; top: 0; }
+  th { padding: 10px 8px; text-align: left; cursor: pointer; user-select: none; white-space: nowrap; border-bottom: 2px solid #e9ecef; }
+  th:hover { background: #e9ecef; }
+  th .arrow { font-size: 11px; color: #999; margin-left: 4px; }
+  td { padding: 8px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+  tr:hover td { background: #f8f9ff; }
+  td.status-enabled  { color: #27ae60; font-weight: 600; }
+  td.status-disabled { color: #e74c3c; font-weight: 600; }
+  td.size-col { text-align: right; }
+  td.email-col { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+
+  .no-data { text-align: center; padding: 48px 16px; color: #999; }
+
+  .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+
+  @media (max-width: 768px) {
+    .header { padding: 12px 16px; }
+    .header h1 { font-size: 16px; }
+    .container { padding: 8px; }
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 12px; }
+    .stat-card .value { font-size: 20px; }
+    td, th { font-size: 12px; padding: 6px 4px; }
+    td.email-col { max-width: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Exchange 邮箱清单</h1>
+  <span class="update-info" id="updateInfo">加载中...</span>
+</div>
+
+<div class="container">
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="label">总邮箱数</div><div class="value blue" id="statTotal">-</div></div>
+    <div class="stat-card"><div class="label">已启用</div><div class="value green" id="statActive">-</div></div>
+    <div class="stat-card"><div class="label">已禁用</div><div class="value red" id="statInactive">-</div></div>
+    <div class="stat-card"><div class="label">总容量</div><div class="value blue" id="statSize">-</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="search" id="searchInput" placeholder="搜索姓名、账号、邮箱、部门、OU..." />
+    <details class="col-toggle">
+      <summary>显示列 ▾</summary>
+      <ul id="colToggle"></ul>
+    </details>
+    <button class="btn-export" onclick="exportCSV()">导出 CSV</button>
+  </div>
+
+  <div class="table-wrap">
+    <table id="mailboxTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="no-data" id="noData" style="display:none;">无匹配数据</div>
+  </div>
+
+  <div class="footer">数据来自 Exchange Management Shell · 每日自动更新</div>
+</div>
+
+<script>
+const COLUMNS = [
+  { key: "name",      label: "姓名",     always: true },
+  { key: "account",   label: "账号",     always: false },
+  { key: "dept",      label: "部门",     always: false },
+  { key: "ou",        label: "组织OU",   always: false },
+  { key: "email",     label: "邮箱地址", always: false },
+  { key: "sizeMB",    label: "大小(MB)", always: false, numeric: true },
+  { key: "createdOn", label: "创建时间", always: false },
+  { key: "lastLogon", label: "上次登录", always: false },
+  { key: "status",    label: "状态",     always: true },
+];
+
+let data = [];
+let filtered = [];
+let sortKey = null;
+let sortAsc = true;
+let hiddenCols = new Set(["email", "createdOn", "lastLogon"]);
+
+function fmtSize(mb) {
+  if (mb == null) return "-";
+  if (mb >= 1024) return (mb / 1024).toFixed(2) + " GB";
+  return mb.toFixed(1) + " MB";
+}
+
+function renderStats(d) {
+  const total = d.length;
+  const active = d.filter(r => r.status === "启用").length;
+  const inactive = d.filter(r => r.status === "禁用").length;
+  const totalSizeMB = d.reduce((s, r) => s + (r.sizeMB || 0), 0);
+  document.getElementById("statTotal").textContent = total;
+  document.getElementById("statActive").textContent = active;
+  document.getElementById("statInactive").textContent = inactive;
+  document.getElementById("statSize").textContent = fmtSize(totalSizeMB);
+}
+
+function renderTable() {
+  const query = (document.getElementById("searchInput").value || "").toLowerCase().trim();
+
+  filtered = data.filter(r => {
+    if (!query) return true;
+    const vals = [r.name, r.account, r.dept, r.ou, r.email, r.status].filter(Boolean);
+    return vals.some(v => v.toLowerCase().includes(query));
+  });
+
+  if (sortKey) {
+    filtered.sort((a, b) => {
+      let va = a[sortKey], vb = b[sortKey];
+      if (va == null) va = "";
+      if (vb == null) vb = "";
+      if (typeof va === "number") return sortAsc ? va - vb : vb - va;
+      return sortAsc ? String(va).localeCompare(String(vb), "zh") : String(vb).localeCompare(String(va), "zh");
+    });
+  }
+
+  // Thead
+  const head = document.getElementById("tableHead");
+  head.innerHTML = `<tr>${COLUMNS.filter(c => !hiddenCols.has(c.key)).map(c => {
+    const arrow = sortKey === c.key ? (sortAsc ? "▲" : "▼") : "";
+    return `<th onclick="sortBy('${c.key}')">${c.label}<span class="arrow">${arrow}</span></th>`;
+  }).join("")}</tr>`;
+
+  // Tbody
+  const visCols = COLUMNS.filter(c => !hiddenCols.has(c.key));
+  const body = document.getElementById("tableBody");
+  if (filtered.length === 0) {
+    body.innerHTML = "";
+    document.getElementById("noData").style.display = "block";
+    return;
+  }
+  document.getElementById("noData").style.display = "none";
+
+  body.innerHTML = filtered.map(r => {
+    const statusCls = r.status === "启用" ? "status-enabled" : "status-disabled";
+    return `<tr>${visCols.map(c => {
+      let val = r[c.key];
+      if (c.key === "sizeMB") return `<td class="size-col">${fmtSize(val)}</td>`;
+      if (c.key === "email")  return `<td class="email-col" title="${val || ""}">${val || ""}</td>`;
+      if (c.key === "status") return `<td class="${statusCls}">${val || ""}</td>`;
+      return `<td>${val || ""}</td>`;
+    }).join("")}</tr>`;
+  }).join("");
+
+  renderStats(filtered);
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  renderTable();
+}
+
+// Column toggle
+function buildColToggle() {
+  const list = document.getElementById("colToggle");
+  list.innerHTML = COLUMNS.map(c => {
+    if (c.always) return "";
+    const checked = !hiddenCols.has(c.key);
+    return `<li class="${checked ? "" : "hidden"}" data-key="${c.key}" onclick="toggleCol('${c.key}')">${checked ? "☑" : "☐"} ${c.label}</li>`;
+  }).join("");
+}
+
+function toggleCol(key) {
+  if (hiddenCols.has(key)) hiddenCols.delete(key);
+  else hiddenCols.add(key);
+  buildColToggle();
+  renderTable();
+}
+
+function exportCSV() {
+  const cols = COLUMNS.filter(c => !hiddenCols.has(c.key));
+  const rows = filtered.length ? filtered : data;
+  let csv = cols.map(c => c.label).join(",") + "\n";
+  rows.forEach(r => {
+    csv += cols.map(c => {
+      let v = r[c.key];
+      if (v == null) v = "";
+      if (typeof v === "string" && (v.includes(",") || v.includes('"') || v.includes("\n"))) {
+        v = '"' + v.replace(/"/g, '""') + '"';
+      }
+      return v;
+    }).join(",") + "\n";
+  });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "MailboxReport_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Search input debounce
+let searchTimer;
+document.getElementById("searchInput").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderTable, 200);
+});
+
+// Load data
+async function loadData() {
+  try {
+    const [mailRes, sumRes] = await Promise.all([
+      fetch("/api/mailboxes"),
+      fetch("/api/summary")
+    ]);
+    if (!mailRes.ok) throw new Error("No data");
+    data = await mailRes.json();
+    if (!Array.isArray(data)) throw new Error("Invalid format");
+    if (sumRes.ok) {
+      const sum = await sumRes.json();
+      if (sum.updateTime) document.getElementById("updateInfo").textContent = "更新于 " + sum.updateTime;
+    }
+    buildColToggle();
+    renderTable();
+  } catch(e) {
+    document.getElementById("tableBody").innerHTML =
+      `<tr><td colspan="${COLUMNS.length}" class="no-data">暂无数据，请先运行 GetMailbox.ps1 导出脚本，然后刷新页面。</td></tr>`;
+    document.getElementById("updateInfo").textContent = "等待首次导出...";
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
